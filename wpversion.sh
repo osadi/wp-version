@@ -5,8 +5,9 @@ clear
 CHECK_DIR=""
 
 # Columns
-FIRST=50
+FIRST=40
 SECOND=20
+THIRD=20
 
 # Is BADUSER used for the DB?
 BAD_USER="root"
@@ -26,9 +27,10 @@ VERSION_REGEX="(([0-9]\.[0-9])(\.[0-9])?)"
 
 DIRS=$(ls -l $CHECK_DIR | egrep '^d' | awk '{print $9}')
 WP_VERSION=$(curl -L -s http://wordpress.org/download/ | grep -oP "Version \K(${VERSION_REGEX})")
+DIR_COUNT=$(echo "$DIRS" | wc -l)
 
-# Print head
-printf "$BLUE%-${FIRST}s %-${SECOND}s %s$RESET\n" "Folder" "Version ($WP_VERSION)" "DB-USER"
+# Print headers
+printf "$BLUE%-${FIRST}s %-${SECOND}s %-${THIRD}s %s$RESET\n" "Folders (total: ${DIR_COUNT})" "Version ($WP_VERSION)" "DB-user" "Suggested"
 printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' -
 
 # Print customer and version
@@ -42,6 +44,7 @@ do
     if [ -e "$WP_VERSION_FILE" ]; then
         CUSTOMER_WP_VERSION=$(grep -oP "wp_version = '\K(${VERSION_REGEX})" "${WP_VERSION_FILE}")
         DB_USER=$(grep -oP "DB_USER', '\K([a-zA-Z]*)" "${WP_CONFIG_FILE}")
+        DB_NAME=$(grep -oP "DB_NAME', '\K([a-zA-Z]*)" "${WP_CONFIG_FILE}")
 
         # Replace dots and pad right with spaces.
         # Then replace spaces with 0
@@ -60,10 +63,22 @@ do
         # Check for BAD_USER
         shopt -s nocasematch
         case "$DB_USER" in
-            $BAD_USER ) USER_COLOR=$RED;;
-            *) USER_COLOR=$GREEN;;
+            $BAD_USER )
+                USER_COLOR=$RED
+                SUGGESTED_USER=$DB_NAME
+            ;;
+            *)
+                USER_COLOR=$GREEN
+                SUGGESTED_USER=""
+            ;;
         esac
 
-        printf "%-${FIRST}s $WP_VERSION_COLOR%-${SECOND}s$RESET $USER_COLOR%s$RESET\n" ${DIR} ${CUSTOMER_WP_VERSION} ${DB_USER}
+        ROW="${DIR} ${CUSTOMER_WP_VERSION} ${DB_USER} ${SUGGESTED_USER}"
+        printf "%-${FIRST}s $WP_VERSION_COLOR%-${SECOND}s$RESET $USER_COLOR%-${THIRD}s $CYAN%s$RESET\n" $ROW
+
+        COUNTER=$[$COUNTER +1]
     fi
 done
+# Footer
+printf '%*s\n' "${COLUMNS:-$(tput cols)}" '' | tr ' ' -
+printf "$YELLOW%-${FIRST}s$RESET\n" "WP-folders ($COUNTER)"
